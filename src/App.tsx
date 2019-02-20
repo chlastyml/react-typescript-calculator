@@ -5,8 +5,6 @@ export class App extends Component {
     render() {
         return <>
             <Calculator />
-            <Calculator />
-            <Calculator />
         </>;
     }
 }
