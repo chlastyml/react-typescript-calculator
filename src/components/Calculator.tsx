@@ -5,70 +5,151 @@ import Button from "./Button";
 import Buttons from "./Buttons";
 import { Display } from "./Display";
 
+enum Action {
+    REMOVE,
+    RESULT,
+    CLEAR,
+}
+
 type Props = {};
 type States = typeof initialState;
 
+enum Item {
+    NUMBER,
+    OPERATOR,
+    ACTION,
+    EMPTY,
+    ERROR,
+}
+
 const initialState = {
-    operations: new Array<string>(),
+    lastItem: Item.EMPTY,
+    operations: "0",
+};
+
+/**
+ * return true if value is number or dot.
+ */
+const isNumber = (value: string) => {
+    return (new RegExp("[\.0-9]")).test(value);
+};
+
+/**
+ * return true if value is operator.
+ */
+const isOperator = (value: string) => {
+    return (new RegExp("/|-|\\+|\\*")).test(value);
+};
+
+/**
+ * return true if value is action.
+ */
+const isAction = (value: string) => {
+    return (new RegExp("delete|backspace|enter")).test(value);
 };
 
 class Calculator extends Component<Props, States> {
     state = initialState;
 
     calculateOperations = () => {
-        let result = this.state.operations.join("");
-        if (result) {
-            result = math.eval(result);
-            result = math.format(result, { precision: 14 });
-            result = String(result);
+        let result = this.state.operations;
+        try {
+            if (result) {
+                result = math.eval(result);
+                result = math.format(result, { precision: 14 });
+                result = String(result);
+                this.setState({
+                    lastItem: Item.NUMBER,
+                    operations: result,
+                });
+            }
+        } catch (err) {
+            const lastState: States = this.state;
             this.setState({
-                operations: result.split(""),
+                lastItem: Item.ERROR,
+                operations: "ERROR",
             });
+            setTimeout(() => {
+                this.setState(lastState);
+            }, 1000);
         }
     }
-    processNumber = (value: string) => {
+
+    addNumber = (value: string) => {
+        this.setState({
+            lastItem: Item.NUMBER,
+            operations: this.state.operations + value,
+        });
+    }
+
+    addOperator = (value: string) => {
+        if (this.state.lastItem === Item.OPERATOR) {
+            this.processAction(Action.REMOVE);
+        }
+        this.setState({
+            lastItem: Item.OPERATOR,
+            operations: this.state.operations + value,
+        });
+    }
+
+    processAction = (value: Action) => {
         switch (value) {
-            case "Delete":
+            case Action.CLEAR:
                 this.setState({
-                    operations: [],
+                    lastItem: Item.EMPTY,
+                    operations: "0",
                 });
                 break;
-            case "Backspace":
-                const copy = [...this.state.operations];
-                copy.pop();
+            case Action.REMOVE:
                 this.setState({
-                    operations: copy,
+                    operations: this.state.operations.slice(0, -1),
                 });
                 break;
-            case "Enter":
+            case Action.RESULT:
                 this.calculateOperations();
                 break;
             default:
-                if (value === "0" && this.state.operations.length === 0) { break; }
-                this.setState({
-                    operations: [...this.state.operations, value],
-                });
-                break;
+                throw new Error("Unsupported action");
         }
     }
+
+    whichItem = (value: string) => {
+        if (value === undefined) { return Item.EMPTY; }
+        if (isNumber(value)) { return Item.NUMBER; }
+        if (isOperator(value)) { return Item.OPERATOR; }
+        if (isAction(value)) { return Item.ACTION; }
+
+        // console.warn(`Value(${value}) is not supported.`);
+    }
+
+    whichAction = (value: string): Action => {
+        if (value === "delete") { return Action.CLEAR; }
+        if (value === "backspace") { return Action.REMOVE; }
+        if (value === "enter") { return Action.RESULT; }
+
+        throw new Error(`Value(${value}) is not supported.`);
+    }
+
+    process = (value: string) => {
+        if (this.state.lastItem === Item.ERROR) { return; }
+        if (this.state.operations === "0") { this.processAction(Action.REMOVE); }
+        const copyValue = value.toLowerCase();
+        const item = this.whichItem(copyValue);
+        switch (item) {
+            case Item.NUMBER: return this.addNumber(copyValue);
+            case Item.OPERATOR: return this.addOperator(copyValue);
+            case Item.ACTION: return this.processAction(this.whichAction(copyValue));
+        }
+    }
+
     handleClick = (e: any) => {
         const value = e.target.getAttribute("data-value");
-        this.processNumber(value);
+        this.process(value);
     }
 
     handleKeyDown = (e: any) => {
         const value = e.code === "Space" ? "0" : e.key;
-        if (
-            (new RegExp("[0-9]")).test(value) ||
-            value === "Delete" ||
-            value === "Backspace" ||
-            value === "Enter" ||
-            value === "/" ||
-            value === "*" ||
-            value === "-" ||
-            value === "+") {
-            this.processNumber(value);
-        }
+        this.process(value);
     }
 
     componentDidMount() {

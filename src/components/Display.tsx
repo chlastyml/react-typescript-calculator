@@ -1,10 +1,9 @@
 import React, { Component } from "react";
 
 type Props = {
-    data: string[],
+    data: string,
 };
 
 export const Display = (props: Props) => {
-    const value = props.data.join("");
-    return <div className="Display"> {value} </div>;
+    return <div className="Display"> {props.data} </div>;
 };
